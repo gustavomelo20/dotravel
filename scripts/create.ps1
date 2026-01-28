@@ -63,11 +63,16 @@ function Add-DbSetIfMissing([string]$file, [string]$entitySingular, [string]$ent
     }
     $dbsetLine = "    public DbSet<$entitySingular> $entityPlural { get; set; }"
     if ($content -notmatch [regex]::Escape($dbsetLine)) {
-        $insertAfter = 'class DataBseContext : DbContext\s*\{[\s\S]*?\R'
-        $content = [System.Text.RegularExpressions.Regex]::Replace($content, $insertAfter, {
-            param($m)
-            return $m.Value + $dbsetLine + "`r`n"
-        }, 1)
+        # Insert right after the opening brace of DataBseContext class (compatible with Windows PowerShell regex)
+        $pattern = '(class\s+DataBseContext\s*:\s*DbContext\s*\{)'
+        if ($content -match $pattern) {
+            $content = [System.Text.RegularExpressions.Regex]::Replace($content, $pattern, {
+                param($m)
+                return $m.Groups[1].Value + "`r`n" + $dbsetLine + "`r`n"
+            }, 1)
+        } else {
+            Write-Warning "Could not find DataBseContext class signature in $file"
+        }
         Set-Content -Path $file -Value $content -Encoding UTF8
         Write-Host "Added DbSet: $entityPlural in DataBseContext"
     }
